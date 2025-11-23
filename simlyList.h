@@ -30,6 +30,6 @@ public:
     void printList() const;
     bool deleteByKey(const std::string& key);
 
-    //std::pair<std::string, std::string> searchByKey(const std::string& key);
+    [[nodiscard]] std::pair<std::string, std::string> searchByKey(const std::string& key) const;
 };
 #endif

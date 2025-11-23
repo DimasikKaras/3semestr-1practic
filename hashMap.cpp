@@ -94,6 +94,7 @@ void HashMap::saveToFile(const string& filename) const {
     for (const auto& item : allItems) {
         data.push_back(item.second);
     }
+
     ofstream file(filename);
     file << data.dump(4);
 }
@@ -129,6 +130,15 @@ void HashMap::rehash() {
 
     delete[] oldTable;
 
+}
+
+std::pair<std::string, std::string> HashMap::searchByKey(const std::string &key) const {
+    if (table == nullptr) return {"", ""};
+
+    size_t index = hashFunction(key);
+    if (table[index].list == nullptr) return {"", ""};
+
+    return table[index].list->searchByKey(key);
 }
 
 

@@ -1,10 +1,9 @@
 #include <fstream>
 #include <random>
 #include <iostream>
+#include <filesystem>
 
 #include "hashMap.h"
-
-
 
 using namespace std;
 using namespace nlohmann;
@@ -12,6 +11,40 @@ using namespace nlohmann;
 
 static mt19937 gen(chrono::steady_clock::now().time_since_epoch().count());
 static uniform_int_distribution<uint32_t> dist(0, 1025);
+
+
+void help() {
+    cout << "./no_sql_dbms -h, --help    показать эту справку" << endl;
+    cout << "./no_sql_dbms <collection> print   вывести хеш-таблицу" << endl;
+    cout << "./no_sql_dbms <collection> remove  удалить коллекцию" << endl;
+    cout << "./no_sql_dbms <filename> <command> <query> " << endl;
+    cout << "=========filename==============" << endl;
+    cout
+    << "Файл автоматически сохраняется с разрешением .json по пути /директория проекта/my_database/имя вашего файла.json "
+            << endl;
+    cout << "=========command===============" << endl;
+    cout << "Перечень доступных команд: " << endl;
+    cout << "insert - добавить документ в коллекцию " << endl;
+    cout << "find   - поиск документа по параметрам " << endl;
+    cout << "delete - удаление документа по параметрам " << endl;
+    cout << "=========query=================" << endl;
+    cout << "Доступные операторы и примеры их использования в поиске и в удалении: " << endl;
+    cout << R"('{"$eq": [{"_id": "1763888722455_1021"}]}'   [$eq - равенство (используется по умолчанию)])" << endl;
+    cout << R"('{"name": "Alice", "city": "London"}'        [неявный AND])" << endl;
+    cout << R"('{"$and": [{"age": 25}, {"city": "Paris"}]}' [явный $AND])" << endl;
+    cout << R"('{"$or": [{"age": 25}, {"city": "Paris"}]}'  [$or]')" << endl;
+    cout << R"('{"age": {"$gt": 20}}'                       [$gt - больше])" << endl;
+    cout << R"('{"age": {"$lt": 20}}'                       [$gt - меньше])" << endl;
+    cout << R"('{"name": {"$like": "Ali%"}}'                [$like - поиск по маске строки (% - любая строка, _ - один символ)])" << endl;
+    cout << R"('{"city": {"$in": ["London", "Paris"]}}'     [$in - проверить принадлежность к массиву])" << endl;
+    cout << "=========Примеры использования=========" << endl;
+    cout << R"(./no_sql_dbms collection insert '{"name": "Alice", "age": 25, "city": "London"}')" << endl;
+    cout << "Вставка документа со случайным сгенерированным id" << endl;
+    cout << R"(./no_sql_dbms collection find '{"$or": [{"age": 25}, {"city": "Paris"}]}')" << endl;
+    cout << "Поиск документа с оператором $or" << endl;
+    cout << R"(./no_sql_dbms collection delete '{"name": {"$like": "A%"}}' )" << endl;
+    cout << "Удаление документа с использованием оператора $like" << endl;
+}
 
 string generate_id() {
     const auto now = chrono::duration_cast<chrono::milliseconds>(
@@ -28,36 +61,6 @@ void insertDoc(HashMap* map, const string& jsonCommand) {
     cout << "Document inserted successfully." << endl;
 }
 
-void help() {
-    cout << "./no_sql_dbm -h, --help    показать эту справку" << endl;
-    cout << "./no_sql_dbm <filename> <command> <query> " << endl;
-    cout << "=========filename==============" << endl;
-    cout
-    << "Файл автоматически сохраняется с разрешением .json по пути /директория проекта/my_database/имя вашего файла.json "
-            << endl;
-    cout << "=========command===============" << endl;
-    cout << "Перечень доступных команд: " << endl;
-    cout << "insert - добавить документ в коллекцию " << endl;
-    cout << "find   - поиск документа по параметрам " << endl;
-    cout << "delete - удаление документа по параметрам " << endl;
-    cout << "=========query=================" << endl;
-    cout << "Доступные операторы и примеры их использования в поиске и в удалении: " << endl;
-    cout << R"({"$eq": [{"_id": "1763888722455_1021"}]}     [$eq - равенство (используется по умолчанию)])" << endl;
-    cout << "{\"name\": \"Alice\", \"city\": \"London\"}        [неявный AND]" << endl;
-    cout << "{\"$and\": [{\"age\": 25}, {\"city\": \"Paris\"}]} [явный $AND]" << endl;
-    cout << R"('{"$or": [{"age": 25}, {"city": "Paris"}]}  [$or]')" << endl;
-    cout << "{\"age\": {\"$gt\": 20}}                           [$gt - больше]" << endl;
-    cout << "{\"age\": {\"$lt\": 20}}                           [$gt - меньше]" << endl;
-    cout << "{\"name\": {\"$like\": \"Ali%\"}}                  [$like - поиск по маске строки (% - любая строка, _ - один символ)]" << endl;
-    cout << "{\"city\": {\"$in\": [\"London\", \"Paris\"]}}     [$in - проверить принадлежность к массиву]" << endl;
-    cout << "=========Примеры использования=========" << endl;
-    cout << "./no_sql_dbms collection insert \'{\"name\": \"Alice\", \"age\": 25, \"city\": \"London\"}\'" << endl;
-    cout << "Вставка документа со случайным сгенерированным id" << endl;
-    cout << "./no_sql_dbms collection find \'{\"$or\": [{\"age\": 25}, {\"city\": \"Paris\"}]}\'" << endl;
-    cout << "Поиск документа с оператором $or" << endl;
-    cout << "./no_sql_dbms collection delete \'{\"name\": {\"$like\": \"A%\"}}\' " << endl;
-    cout << "Удаление документа с использованием оператора $like" << endl;
-}
 
 bool matchesCondition(const json& doc, const string& field, const json& condition) {
     if (!doc.contains(field)) return false;
@@ -144,15 +147,20 @@ bool matchesQuery(const json& doc, const json& query) {
     return true;
 }
 
-
 void findDoc(const HashMap* map, const string& jsonCommand) {
     const json query = json::parse(jsonCommand);
     const auto allItems = map->items();
     bool found = false;
+    int count = 1;
+
+    cout << "Found:" << endl;
 
     for (const auto& [fst, snd] : allItems) {
         if (matchesQuery(snd, query)) {
-            cout << snd.dump(4) << endl;
+            auto p = map->searchByKey(fst);
+            if (!p.first.empty() && !p.second.empty()) {
+                cout << count++ << ". " << p.second << endl;
+            }
             found = true;
         }
     }
@@ -216,7 +224,16 @@ int main(int argc, char* argv[]) {
                 cout << "=== Коллекция: " << collection_name << " ===" << endl;
                 map.print();
                 return 0;
-            } else {
+            } else if (command == "remove") {
+                ifstream file(filename);
+                if (std::filesystem::exists(filename)) {
+                    std::filesystem::remove(filename);
+                    cout << "Файл " << collection_name << ".json удалён" << endl;
+                    return 0;
+                } else {
+                    throw runtime_error("файл не найден");
+                }
+            }else {
                 if (command == "find" || command == "insert" || command == "delete") {
                     throw runtime_error("команда '" + command + "' требует json-запрос");
                 } else {
@@ -241,8 +258,6 @@ int main(int argc, char* argv[]) {
         } else if (command == "delete") {
             deleteDoc(&map, jsonCommand);
             map.saveToFile(filename);
-        } else if (command == "print"){
-            map.print();
         }else {
             throw runtime_error("неизвестный запрос, введите ключ -h, --help для справки");
         }

@@ -16,7 +16,7 @@ SimplyList::SimplyList() : head(nullptr), tail(nullptr) {}
 
 SimplyList::~SimplyList() {
     while (head != nullptr) {
-        const SimplyNode* temp = head;
+        SimplyNode* temp = head;
         head = head->next;
         delete temp;
     }
@@ -77,6 +77,17 @@ void SimplyList::printList() const {
         index++;
     }
     cout << "[NULL]" << endl;
+}
+
+pair<string, string> SimplyList::searchByKey(const std::string &key) const {
+    SimplyNode* current = head;
+    while (current != nullptr) {
+        if (current->id_ == key) {
+            return make_pair(current->id_, current->data.dump(4));
+        }
+        current = current ->next;
+    }
+    return make_pair("", "");
 }
 
 
