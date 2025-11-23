@@ -100,23 +100,26 @@ void HashMap::saveToFile(const string& filename) const {
 
 void HashMap::rehash() {
     const size_t oldCapacity = capacity;
-    const HashMapNode* oldTable = table;
+    HashMapNode* oldTable = table;
 
     capacity = capacity * 2 + 1;
     size = 0;
 
     table = new HashMapNode[capacity];
     for (size_t i = 0; i < capacity; i++) {
-        table[i].list = new SimplyList;
+        table[i].list = new SimplyList();
     }
 
     for (size_t i = 0; i < oldCapacity; i++) {
         const SimplyList* currentList = oldTable[i].list;
-        const auto current = currentList->getHead();
+        auto current = currentList->getHead();
 
         while (current != nullptr) {
-            hashMapInsert(current->id_, current->data);
-            current -> next;
+            int newIndex = hashFunction(current->id_);
+            table[newIndex].list->addHead(current->id_, current->data);
+
+            size++;
+            current = current->next;
         }
     }
 
